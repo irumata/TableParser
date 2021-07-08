@@ -3,10 +3,11 @@ import pandas as pd
 
 #class to store change 
 class TableChange:
-    def _init_(self, index, old_value, comment=""):
+    def _init_(self, index, old_value, comment="", probability = 1):
         self.index=index
         seld.old_value = old_value
         self.comment = comment
+        self.probability = probability
 
 #class for on heuristic
 class TableParserItem:
