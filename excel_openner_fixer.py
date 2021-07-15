@@ -1,4 +1,6 @@
 import tempfile, zipfile
+import os
+
 def fix_xlsx(in_file):
     tmpfd, tmp = tempfile.mkstemp(dir=os.path.dirname(in_file))
     os.close(tmpfd)
