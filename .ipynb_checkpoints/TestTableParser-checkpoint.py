@@ -8,6 +8,18 @@ class TestTableParser(TableParser.TableParserItem):
     
     def parse(self, series: pd.Series):
         mistake = {
+            'Jan':'01',
+            'Feb': '02',
+            'Mar':'03',
+            'Apr':'04',
+            'May':'05',
+            'Jun':'06',
+            'Jul':'07',
+            'Aug':'08',
+            'Sep':'09',
+            'Oct':'10',
+            'Nov':'11',
+            'Dec':'12',
             'o': '0',
             'l': '1',
             'b': '6',
@@ -23,7 +35,7 @@ class TestTableParser(TableParser.TableParserItem):
             'O': '0',
             'D': '0',
             'E': '3',
-            'A': '4',
+            'A': '4444',
             'S': '5',
             r'[ -/]|[:-@]|[\[-_]|[{-~]': '-',
         }
