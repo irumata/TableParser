@@ -1,7 +1,6 @@
 import TableParser
 import pandas as pd
 
-
 class TestTableParser(TableParser.TableParserItem):
     def __init__(self):
         pass
@@ -16,7 +15,7 @@ class TestTableParser(TableParser.TableParserItem):
             'Jun':'06',
             'Jul':'07',
             'Aug':'08',
-            'Sep':'09',
+            'Sept':'09',
             'Oct':'10',
             'Nov':'11',
             'Dec':'12',
@@ -35,11 +34,10 @@ class TestTableParser(TableParser.TableParserItem):
             'O': '0',
             'D': '0',
             'E': '3',
-            'A': '4444',
+            'A': '4',
             'S': '5',
             r'[ -/]|[:-@]|[\[-_]|[{-~]': '-',
         }
         for key, val in mistake.items():
-            series = series.str.replace(key, val, regex=True)
-            # print(series)
+            series = series.str.strip().str.replace(key, val, regex=True)
         return (pd.to_datetime(series, errors="ignore"), [])

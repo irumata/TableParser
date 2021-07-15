@@ -5,7 +5,7 @@ import pandas as pd
 class TableChange:
     def _init_(self, index, old_value, comment="", probability = 1):
         self.index=index
-        seld.old_value = old_value
+        self.old_value = old_value
         self.comment = comment
         self.probability = probability
 
