@@ -76,18 +76,12 @@ class TestTableParser(TableParser.TableParserItem):
         return x, y
 
     def all_action(self,df):
-        data_row_num, data_col_num = self.find_coordinate(0, 0, df)
+        data_row_num, data_col_num = self.find_coordinate(0, 0, df) # <-- find coordinate of dates
         date = df.iloc[data_row_num, data_col_num:].reset_index(drop=True)  # <--- Series with date (01.03.2016;...)
         table = df.iloc[data_row_num:, data_col_num:].reset_index(drop=True)  # <--- all useful data
         date = self.parse(date) # < --- parse date for correction
         table.iloc[0] = date[0] # < --- set new call date to the table
-        print(table.iloc[0].reset_index(drop=True))  # check of new date in data  ##(((JUST switch ON/OFF)))##
+#       print(table.iloc[0].reset_index(drop=True))         # check of new date in data  ##(((JUST switch ON/OFF)))##
         table.columns = table.iloc[0] # <--- change column names
         table = table.iloc[1:, :] # <--- remove first row
         return table
-
-
-# parserClass = TestTableParser()
-# parserClass.fix_xlsx('file2.xlsx')
-# df = pd.read_excel('file2.xlsx')
-# parserClass.all_action()
