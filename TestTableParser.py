@@ -2,6 +2,10 @@ import TableParser
 import pandas as pd
 import tempfile, zipfile
 import os
+import numpy as np
+import datetime
+from collections import Counter
+import time
 
 class TestTableParser(TableParser.TableParserItem):
     def __init__(self):
@@ -9,40 +13,14 @@ class TestTableParser(TableParser.TableParserItem):
     
     def parse(self, series: pd.Series):
         mistake = {
-            'Jan':'01',
-            'Feb': '02',
-            'Mar':'03',
-            'Apr':'04',
-            'May':'05',
-            'Jun':'06',
-            'Jul':'07',
-            'Aug':'08',
-            'Sept':'09',
-            'Oct':'10',
-            'Nov':'11',
-            'Dec':'12',
-            'o': '0',
-            'l': '1',
-            'b': '6',
-            'g': '9',
-            'q': '9',
-            't': '7',
-            'v': '5',
-            'G': '6',
-            'F': '7',
-            'Z': '2',
-            'Q': '2',
-            'B': '8',
-            'O': '0',
-            'D': '0',
-            'E': '3',
-            'A': '4',
-            'S': '5',
+            "00:00:00":'','0:00':'',
+            'Jan':'01','Feb': '02','Mar':'03','Apr':'04','May':'05','Jun':'06','Jul':'07','Aug':'08','Sept':'09','Oct':'10','Nov':'11','Dec':'12',
+            'o': '0','l': '1','b': '6','g': '9','q': '9','t': '7','v': '5','G': '6','F': '7','Z': '2','Q': '2','B': '8','O': '0','D': '0','E': '3','A': '4','S': '5',
             r'[ -/]|[:-@]|[\[-_]|[{-~]': '-',
         }
         for key, val in mistake.items():
             series = series.str.strip().str.replace(key, val, regex=True)
-        return (pd.to_datetime(series, errors="ignore"), [])
+        return (pd.to_datetime(series, errors="coerce"), [])
 
     def fix_xlsx(self, in_file):
         tmpfd, tmp = tempfile.mkstemp(dir=os.path.dirname(in_file))
@@ -61,27 +39,156 @@ class TestTableParser(TableParser.TableParserItem):
         data = data.replace('/xl/sharedStrings.xml', '/xl/SharedStrings.xml')
         with zipfile.ZipFile(in_file, mode='a', compression=zipfile.ZIP_DEFLATED) as zf:
             zf.writestr(filename, data)
-
-    ###############################################
-    # to find the x,y coordinate of row with date #
-    def find_coordinate(self, x, y, df):
-        for i in range(df.shape[0]):
-            if df.iloc[i, 0] == 'Дата на начало периода':
-                x = i
+            
+    def orientation_determine(self,df):
+        list_columns = []
+        for j in range(df.shape[1]):
+            list_columns.append(pd.to_numeric(df.iloc[:,j],errors='coerce').dropna())
+        clear_df = pd.concat(list_columns,axis=1)
+        if clear_df.shape[0] > clear_df.shape[1]:
+            return True
+        else: return False
+        
+    def find_start_point(self,clear_df):
+        start_point = 0
+        for i in range(clear_df.shape[0]):
+            if len(clear_df.iloc[i,:].dropna()) > 2:
+                start_point = i
                 break
-        for j in range(1, df.shape[1]):
-            if type(df.iloc[x, j]) == type('string'):
-                y = j
-                break
-        return x, y
+        return start_point
+    
+    def define_type_of_cell(self,clear_df,df_data,start_point):
+        columns_types = {}
+        for j in range(clear_df.shape[1]):
+            baff = clear_df.iloc[:,j].dropna()
+            if baff.sum() != 0:
+                if baff.dtype == pd.Float64Dtype():
+                    columns_types[j] = 'float'
+                else: columns_types[j] = 'int'
+            else:
+                if type(testTableParser.parse(df_data.iloc[:,j].astype(str))[0][start_point]) == type(pd.to_datetime('31.01.2002')):
+                    columns_types[j] = 'date'
+                elif baff.dtype == pd.BooleanDtype():
+                    columns_types[j] = 'bool'
+                else: columns_types[j] = 'str'
+        return columns_types
+    
+    def define_breakline(self,clear_df,columns_types):
+        null_list,index_list= [],[]
+        for j in range(clear_df.shape[1]):
+            if columns_types[j] == 'int':
+                null_list.append(clear_df.iloc[:,j])
+        int_df = pd.concat(null_list,axis=1)
+        count = Counter(columns_types.values())
+        for i in range(int_df.shape[0]):
+            if int_df.iloc[i,:].isnull().sum() == count.get('int'):
+                index_list.append(i)
 
-    def all_action(self,df):
-        data_row_num, data_col_num = self.find_coordinate(0, 0, df) # <-- find coordinate of dates
-        date = df.iloc[data_row_num, data_col_num:].reset_index(drop=True)  # <--- Series with date (01.03.2016;...)
-        table = df.iloc[data_row_num:, data_col_num:].reset_index(drop=True)  # <--- all useful data
-        date = self.parse(date) # < --- parse date for correction
-        table.iloc[0] = date[0] # < --- set new call date to the table
-#       print(table.iloc[0].reset_index(drop=True))         # check of new date in data  ##(((JUST switch ON/OFF)))##
-        table.columns = table.iloc[0] # <--- change column names
-        table = table.iloc[1:, :] # <--- remove first row
-        return table
+        return index_list
+
+    def create_list_of_table(self,df,break_line,start_point):
+        return [df.iloc[:break_line[0]+start_point,:],df.iloc[break_line[0]+start_point:,:]]
+            
+
+    def create_header(self,df,start_point,df_data):
+        topic = df.iloc[:start_point,:].fillna(method='ffill',axis=1)
+        list_topic = []
+        for i in range(topic.shape[1]):
+            list_topic.append("__".join(list(topic.iloc[:,i].astype(str))).replace("__nan","").replace("nan__",""))
+        df_data.columns = list_topic
+        return df_data   
+
+    def to_numeric_func(self,df):
+        list_columns = []
+        for j in range(df.shape[1]):
+            list_columns.append(pd.to_numeric(df.iloc[:,j],errors='coerce').convert_dtypes())
+        clear_df = pd.concat(list_columns,axis=1)
+#         start = time.time()
+#         end = time.time()
+#         print(end - start)
+        return clear_df
+
+    def json_creator(self,df,mistake,orientation,columns_types,break_line,index): 
+        if len(break_line) == 0:
+            return {"IsVerticalOrientation,":orientation,
+               "Index rows":[df.index.tolist()],
+               "columns types": columns_types,
+                "mistake fix": mistake
+                }
+        else:
+            return {"IsVerticalOrientation,":orientation,
+               "Index rows":index,
+               "columns types": columns_types,
+                "mistake fix": mistake
+                }
+    
+    def find_errorss(self,s,j):
+        mistake = {'o': '0','l': '1','b': '6','g': '9','q': '9','t': '7','v': '5','f': '7','z': '2','e': '3','s': '5'}
+        finded_error = []
+        for key, val in mistake.items():
+            if len(s[s.astype(str).str.contains(key).dropna()].index.to_list()) != 0:
+                for i in range(len(s[s.astype(str).str.contains(key)].index.to_list())):
+                    finded_error.append({   'row':s[s.astype(str).str.contains(key)].index.to_list()[i],
+                                            'column':j,
+                                            'new value':val,
+                                            'old value':key,
+                                            'probability':99.9,
+                                            'user approve':False,
+                                            'comment':False
+                                        })
+    #             finded_error.append([key,val,j,s[s.astype(str).str.contains(key)].index.to_list()])
+            s = s.astype(str).str.strip().str.replace(key, val, regex=True)
+        return [s,finded_error]
+
+    def change_valuee(self,df,columns_types):
+        # list_right_data = []
+    #     df = pd.read_excel("file44.xlsx",header=None)
+        mistake_index_list = []
+        for j in range(df.shape[1]):
+            if columns_types[j] == 'int' or columns_types[j] == 'float':
+                buff = self.find_errorss(df.iloc[:,j],j)
+                df.iloc[:,j] = pd.to_numeric(buff[0],errors='coerce').convert_dtypes().copy()
+        #     list_right_data.append(pd.to_numeric(buff[0],errors='coerce').convert_dtypes())
+                mistake_index_list.append(buff[1])
+        return [df,np.concatenate(np.array(mistake_index_list), axis=None).tolist()]
+    
+    def all_action(self,df): # <-----    drive method
+        orientation = self.orientation_determine(df)
+
+        print(orientation)
+        if orientation== False:
+            df = df.T
+            
+        clear_df = self.to_numeric_func(df)
+        start_point = self.find_start_point(clear_df)
+        columns_types = self.define_type_of_cell(clear_df.iloc[start_point:,:],df.iloc[start_point:,:],start_point)
+        break_line = self.define_breakline(clear_df.iloc[start_point:,:],columns_types)
+        if  len(break_line) == 0:
+            df_data_and_mistake = self.change_valuee(df.iloc[start_point:,:],columns_types)
+            done_df = self.create_header(df,start_point,df_data_and_mistake[0])
+#             print(df_data_and_mistake[1])
+            json = self.json_creator(df,df_data_and_mistake[1],orientation,columns_types,break_line,[])
+#             print(json)
+            return [done_df,json]
+
+        else:
+            list_df = self.create_list_of_table(df,break_line,start_point)
+            answer_df = []
+            mistake = []
+            index_list = []
+            for i in range(len(list_df)):
+                clear_df = self.to_numeric_func(list_df[i])
+                start_point = self.find_start_point(clear_df)
+                df_data_and_mistake = self.change_valuee(list_df[i].iloc[start_point:,:],columns_types)
+                done_df = self.create_header(list_df[i],start_point,df_data_and_mistake[0])
+                answer_df.append(done_df)
+                mistake.append(df_data_and_mistake[1])
+                index_list.append(list_df[i].index.tolist())
+#             print(mistake)
+            json = self.json_creator(df,mistake,orientation,columns_types,break_line,index_list)
+#             print(json)
+            return [answer_df,json]
+            
+
+
+        
