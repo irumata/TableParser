@@ -31,4 +31,6 @@ class TableParser:
             result[0] = new_series
             result[1]+=(new_changes)
         return result
-            
+    
+    def all_action(self,df):
+        return "puks"
