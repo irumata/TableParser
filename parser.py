@@ -100,11 +100,19 @@ class TestTableParser:
         return self.index_rows
 
     def create_header(self, df, start_point, df_data):
+        cols = []
+        count = 1
         topic = df.iloc[:start_point, :].fillna(method='ffill', axis=1)
         list_topic = []
         for i in range(topic.shape[1]):
             list_topic.append("__".join(list(topic.iloc[:, i].astype(str))).replace("__nan", "").replace("nan__", ""))
-        df_data.columns = list_topic
+        for column in list_topic:
+            if column in cols:
+                cols.append("{0}_{1}".format(str(column), str(count)))
+                count += 1
+                continue
+            cols.append(column)
+        df_data.columns = cols
         return df_data
 
     def to_numeric_func(self, df):
@@ -153,7 +161,7 @@ class TestTableParser:
         for j in range(df.shape[1]):
             if columns_types[j] == 'int' or columns_types[j] == 'float':
                 buff = self.find_errorss(df.iloc[:, j], j)
-                df.iloc[:, j] = pd.to_numeric(buff[0], errors='coerce').convert_dtypes()
+                df.iloc[:, j] = pd.to_numeric(buff[0], errors='coerce')
                 mistake_index_list.append(buff[1])
         return [df, np.concatenate(np.array(mistake_index_list), axis=None).tolist()]
 
@@ -167,8 +175,6 @@ class TestTableParser:
         clear_df = self.to_numeric_func(df)
         start_point = self.find_start_point(clear_df)
         columns_types = self.define_type_of_cell(clear_df.iloc[start_point:, :], df.iloc[start_point:, :], start_point)
-#         columns_types = {0: 'int', 1: 'int', 2: 'float', 3: 'int', 4: 'float', 5: 'date', 6: 'str', 7: 'int', 8: 'int', 9: 'int', 10: 'str', 11: 'int', 12: 'str', 13: 'str', 14: 'int', 15: 'str', 16: 'str', 17: 'str', 18: 'str', 19: 'int', 20: 'str', 21: 'str', 22: 'str', 23: 'str', 24: 'str'}
-#         print(columns_types)
         break_line = self.define_breakline(clear_df.iloc[start_point:, :], columns_types)
         if len(break_line) == 0:
             df_data_and_mistake = self.change_valuee(df.iloc[start_point:, :], columns_types)
